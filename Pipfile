@@ -7,6 +7,8 @@ name = "pypi"
 psycopg2 = "*"
 python-decouple = "*"
 djoser = "*"
+pillow = "*"
+drf-yasg = "*"
 
 [dev-packages]
 

@@ -11,7 +11,7 @@
                     <h3><i class="fas fa-plus-circle"></i> Create New Legal Case</h3>
                 </div>
                 <div class="card-body">
-                    <form method="post">
+                    <form method="post" enctype="multipart/form-data">
                         {% csrf_token %}
                         <div class="mb-3">
                             <label for="{{ form.title.id_for_label }}" class="form-label">Case Title</label>
@@ -23,7 +23,13 @@
                             {{ form.description }}
                             <div class="form-text">Explain the legal situation and why funding is needed.</div>
                         </div>
-                        
+
+                        <div class="mb-3">
+                            <label for="{{ form.image.id_for_label }}" class="form-label">Case Description</label>
+                            {{ form.image }}
+                            <div class="form-text">Upload Case File</div>
+                        </div>
+
                         <div class="row">
                             <div class="col-md-6">
                                 <div class="mb-3">

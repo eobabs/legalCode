@@ -1,3 +1,4 @@
+from django.core.exceptions import ValidationError
 from django.db import models
 
 # Create your models here.
@@ -30,9 +31,14 @@ class Case(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     deadline = models.DateField()
+    image = models.ImageField(upload_to='case_images/', blank=True, null=True)
 
     class Meta:
         ordering = ['-created_at']
+
+    def clean(self):
+        if self.deadline <= timezone.now().date():
+            raise ValidationError('Deadline must be in the future.')
 
     def __str__(self):
         return self.title
@@ -64,6 +70,9 @@ class Case(models.Model):
     def total_donors(self):
         return self.donations.values('donor').distinct().count()
 
+    def can_receive_donations(self):
+        return self.status == 'active' and not self.is_expired
+
 
 class Donation(models.Model):
     case = models.ForeignKey(Case, on_delete=models.CASCADE, related_name='donations')
@@ -76,6 +85,8 @@ class Donation(models.Model):
     message = models.TextField(blank=True)
     is_anonymous = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
+    transaction_id = models.CharField(max_length=100, blank=True, null=True)
+
 
     def __str__(self):
         donor_name = "Anonymous" if self.is_anonymous else self.donor.username
