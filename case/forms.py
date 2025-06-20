@@ -44,7 +44,7 @@ class CaseForm(forms.ModelForm):
             }),
             'goal_amount': forms.NumberInput(attrs={
                 'class': 'form-control',
-                'placeholder': 'Enter funding goal (e.g., 5000)',
+                'placeholder': 'Enter funding goal in Naira (e.g., 5000)',
                 'min': '1'
             }),
             'deadline': forms.DateInput(attrs={
@@ -78,7 +78,7 @@ class DonationForm(forms.ModelForm):
         widgets = {
             'amount': forms.NumberInput(attrs={
                 'class': 'form-control',
-                'placeholder': 'Enter donation amount',
+                'placeholder': 'Enter donation amount in naira',
                 'min': '1',
                 'step': '0.01'
             }),

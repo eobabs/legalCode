@@ -9,6 +9,7 @@ python-decouple = "*"
 djoser = "*"
 pillow = "*"
 drf-yasg = "*"
+requests = "*"
 
 [dev-packages]
 
