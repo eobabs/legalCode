@@ -1,6 +1,8 @@
 from django import forms
 from django.contrib.auth.forms import UserCreationForm
 from django.contrib.auth.models import User
+from django.utils import timezone
+
 from .models import Case, Donation
 
 
@@ -29,7 +31,7 @@ class CustomUserCreationForm(UserCreationForm):
 class CaseForm(forms.ModelForm):
     class Meta:
         model = Case
-        fields = ['title', 'description', 'goal_amount', 'deadline']
+        fields = ['title', 'description', 'goal_amount', 'deadline', 'image']
         widgets = {
             'title': forms.TextInput(attrs={
                 'class': 'form-control',
@@ -47,9 +49,20 @@ class CaseForm(forms.ModelForm):
             }),
             'deadline': forms.DateInput(attrs={
                 'class': 'form-control',
-                'type': 'date'
+                'type': 'date',
+                'min': timezone.now().date().strftime('%Y-%m-%d')
+            }),
+            'image': forms.FileInput(attrs={
+                'class': 'form-control',
+                'accept': 'image/*'
             }),
         }
+
+    def clean_deadline(self):
+        deadline = self.cleaned_data.get('deadline')
+        if deadline and deadline <= timezone.now().date():
+            raise forms.ValidationError("Deadline must be in the future.")
+        return deadline
 
     def clean_goal_amount(self):
         amount = self.cleaned_data.get('goal_amount')

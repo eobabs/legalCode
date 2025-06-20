@@ -1,3 +1,4 @@
+from django.db import transaction
 from django.shortcuts import render
 
 # Create your views here.
@@ -6,7 +7,7 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth import login
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
-from django.db.models import Sum
+from django.db.models import Sum, Q
 from django.urls import reverse_lazy
 from django.views.generic import ListView, DetailView
 from .models import Case, Donation
@@ -14,7 +15,7 @@ from .forms import CustomUserCreationForm, CaseForm, DonationForm
 
 
 def home(request):
-    recent_cases = Case.objects.filter(status='active').order_by('-created_at')[:6]
+    recent_cases = Case.objects.filter(status='active').select_related('creator').order_by('-created_at')[:6]
     total_raised = Donation.objects.aggregate(total=Sum('amount'))['total'] or 0
     total_cases = Case.objects.count()
     total_donors = Donation.objects.values('donor').distinct().count()
@@ -48,7 +49,24 @@ class CaseListView(ListView):
     paginate_by = 9
 
     def get_queryset(self):
-        return Case.objects.filter(status='active').order_by('-created_at')
+        queryset = Case.objects.filter(status='active').select_related('creator')
+
+
+        search_query = self.request.GET.get('search')
+        if search_query:
+            queryset = queryset.filter(
+                Q(title__icontains=search_query) |
+                Q(description__icontains=search_query)
+            )
+
+
+        sort_by = self.request.GET.get('sort', '-created_at')
+        if sort_by in ['-created_at', 'goal_amount', '-goal_amount', 'deadline']:
+            queryset = queryset.order_by(sort_by)
+        else:
+            queryset = queryset.order_by('-created_at')
+
+        return queryset
 
 
 class CaseDetailView(DetailView):
@@ -66,7 +84,7 @@ class CaseDetailView(DetailView):
 @login_required
 def create_case(request):
     if request.method == 'POST':
-        form = CaseForm(request.POST)
+        form = CaseForm(request.POST, request.FILES)
         if form.is_valid():
             case = form.save(commit=False)
             case.creator = request.user
@@ -82,20 +100,30 @@ def create_case(request):
 def donate_to_case(request, pk):
     case = get_object_or_404(Case, pk=pk)
 
+    if not case.can_receive_donations():
+        messages.error(request, 'This case is no longer accepting donations.')
+        return redirect('case_detail', pk=pk)
+
     if request.method == 'POST':
         form = DonationForm(request.POST)
         if form.is_valid():
-            donation = form.save(commit=False)
-            donation.case = case
-            donation.donor = request.user
-            donation.save()
+            try:
+                with transaction.atomic():
+                    donation = form.save(commit=False)
+                    donation.case = case
+                    donation.donor = request.user
+                    donation.save()
 
-            # Update case raised amount
-            case.raised_amount += donation.amount
-            case.save()
+                    case.raised_amount += donation.amount
+                    case.save()
 
-            messages.success(request, f'Thank you for your donation of ${donation.amount}!')
-            return redirect('case_detail', pk=case.pk)
+                    messages.success(
+                        request,
+                        f'Thank you for your donation of ${donation.amount}!'
+                    )
+                    return redirect('case_detail', pk=case.pk)
+            except Exception as e:
+                messages.error(request, 'There was an error processing your donation. Please try again.')
 
     return redirect('case_detail', pk=pk)
 

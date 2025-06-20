@@ -1,3 +1,90 @@
+{% extends 'base.html' %}
+
+{% block title %}Dashboard - Legal Aid Crowdfunding{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="row">
+        <div class="col-12">
+            <h2><i class="fas fa-tachometer-alt"></i> Welcome, {{ user.get_full_name|default:user.username }}!</h2>
+            <p class="text-muted">Manage your cases and view your donation history</p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-lg-8">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5><i class="fas fa-gavel"></i> Your Cases</h5>
+                    <a href="{% url 'create_case' %}" class="btn btn-primary btn-sm">
+                        <i class="fas fa-plus"></i> New Case
+                    </a>
+                </div>
+                <div class="card-body">
+                    {% for case in user_cases %}
+                    <div class="border-bottom pb-3 mb-3">
+                        <div class="row">
+                            <div class="col-md-8">
+                                <h6><a href="{% url 'case_detail' case.pk %}" class="text-decoration-none">{{ case.title }}</a></h6>
+                                <p class="text-muted small">{{ case.description|truncatewords:15 }}</p>
+                            </div>
+                            <div class="col-md-4 text-end">
+                                <div class="mb-2">
+                                    <span class="badge bg-success">${{ case.raised_amount }}</span>
+                                    <span class="text-muted">/ ${{ case.goal_amount }}</span>
+                                </div>
+                                <div class="progress" style="height: 6px;">
+                                    <div class="progress-bar" style="width: {{ case.progress_percentage }}%"></div>
+                                </div>
+                                <small class="text-muted">{{ case.progress_percentage|floatformat:1 }}% funded</small>
+                            </div>
+                        </div>
+                    </div>
+                    {% empty %}
+                    <div class="text-center py-4">
+                        <i class="fas fa-gavel fa-3x text-muted mb-3"></i>
+                        <h5>No cases created yet</h5>
+                        <p class="text-muted">Start your first legal aid campaign</p>
+                        <a href="{% url 'create_case' %}" class="btn btn-primary">Create Your First Case</a>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5><i class="fas fa-heart"></i> Your Recent Donations</h5>
+                </div>
+                <div class="card-body">
+                    {% for donation in user_donations %}
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <div>
+                            <h6 class="mb-1">
+                                <a href="{% url 'case_detail' donation.case.pk %}" class="text-decoration-none">
+                                    {{ donation.case.title|truncatechars:30 }}
+                                </a>
+                            </h6>
+                            <small class="text-muted">{{ donation.created_at|date:"M d, Y" }}</small>
+                        </div>
+                        <span class="badge bg-success">${{ donation.amount }}</span>
+                    </div>
+                    {% empty %}
+                    <div class="text-center py-3">
+                        <i class="fas fa-heart fa-2x text-muted mb-2"></i>
+                        <p class="text-muted">No donations yet</p>
+                        <a href="{% url 'case_list' %}" class="btn btn-outline-primary btn-sm">Browse Cases</a>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+
 {#{% extends 'base.html' %}#}
 {##}
 {#{% block title %}Dashboard - Legal Aid Crowdfunding{% endblock %}#}
