@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load currency_filters %}
 
 {% block title %}Browse Cases - Legal Aid Crowdfunding{% endblock %}
 
@@ -43,8 +44,8 @@
                     <p class="card-text">{{ case.description|truncatewords:15 }}</p>
                     <div class="mb-3">
                         <div class="d-flex justify-content-between small">
-                            <span class="text-success">${{ case.raised_amount }}</span>
-                            <span class="text-muted">of ${{ case.goal_amount }}</span>
+                            <span class="text-success">{{ case.raised_amount|naira }}</span>
+                            <span class="text-muted">of {{ case.goal_amount|naira }}</span>
                         </div>
                         <div class="progress mt-2">
                             <div class="progress-bar bg-success" style="width: {{ case.progress_percentage }}%"></div>
