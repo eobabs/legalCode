@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Thank You for Your Donation!</title>
+</head>
+<body>
+    <p>Dear {{ donation.donor.get_full_name|default:donation.donor.username }},</p>
+
+    <p>Thank you for your generous donation of <strong>₦{{ donation.amount|floatformat:2 }}</strong> to the case: <strong>{{ donation.case.title }}</strong>.</p>
+
+    <p>Your support helps us get closer to the funding goal for this important legal aid case. Every contribution makes a difference!</p>
+
+    <p>You can view the case details here: <a href="{{ request.scheme }}://{{ request.get_host }}{% url 'case_detail' donation.case.pk %}">{{ donation.case.title }}</a></p>
+
+    {% if donation.message %}
+        <p>Your message: <em>"{{ donation.message }}"</em></p>
+    {% endif %}
+
+    <p>Thank you once again for being a part of our mission to provide access to justice.</p>
+
+    <p>Sincerely,<br>The Legal Aid Crowdfunding Team</p>
+</body>
+</html>

@@ -11,7 +11,6 @@ class Command(BaseCommand):
     help = 'Create sample data for demo'
 
     def handle(self, *args, **options):
-        # Create sample users
         if not User.objects.filter(username='demo_user').exists():
             demo_user = User.objects.create_user(
                 username='demo_user',
@@ -29,7 +28,6 @@ class Command(BaseCommand):
                 last_name='Donor'
             )
 
-            # Create sample cases
             case1 = Case.objects.create(
                 title='Fighting Wrongful Termination',
                 description='I was wrongfully terminated from my job after reporting safety violations. I need legal representation to fight this injustice and protect other workers.',
@@ -46,7 +44,6 @@ class Command(BaseCommand):
                 deadline=date.today() + timedelta(days=45)
             )
 
-            # Create sample donations
             Donation.objects.create(
                 case=case1,
                 donor=donor1,
@@ -62,7 +59,6 @@ class Command(BaseCommand):
                 is_anonymous=True
             )
 
-            # Update raised amounts
             case1.raised_amount = case1.donations.aggregate(total=models.Sum('amount'))['total'] or 0
             case2.raised_amount = case2.donations.aggregate(total=models.Sum('amount'))['total'] or 0
             case1.save()

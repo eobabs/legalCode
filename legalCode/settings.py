@@ -72,6 +72,7 @@ TEMPLATES = [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
+                # 'django.conf.global_settings',
             ],
         },
     },
@@ -79,6 +80,7 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'legalCode.wsgi.application'
 
+SITE_URL = config('SITE_URL')
 
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
