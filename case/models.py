@@ -90,7 +90,7 @@ class Donation(models.Model):
 
     def __str__(self):
         donor_name = "Anonymous" if self.is_anonymous else self.donor.username
-        return f"{donor_name} - ${self.amount} to {self.case.title}"
+        return f"{donor_name} - {self.amount} to {self.case.title}"
 
     class Meta:
         ordering = ['-created_at']

@@ -1,18 +1,23 @@
-from django.db import transaction
-from django.shortcuts import render
-
-# Create your views here.
-
-from django.shortcuts import render, redirect, get_object_or_404
+# case/views.py
+import json
 from django.contrib.auth import login
+from django.contrib.auth.models import User
+from django.http import JsonResponse
+from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
+from django.db import transaction
 from django.db.models import Sum, Q
-from django.urls import reverse_lazy
-from django.views.generic import ListView, DetailView
+from django.urls import reverse
+from django.views.generic import DetailView, ListView
+
 from .models import Case, Donation
 from .forms import CustomUserCreationForm, CaseForm, DonationForm
-
+from .payment_utils import PaystackPayment
+from django.conf import settings
+from django.views.decorators.csrf import csrf_exempt
+from decimal import Decimal
+from .emails import send_donation_confirmation_email, notify_case_creator_of_donation
 
 def home(request):
     recent_cases = Case.objects.filter(status='active').select_related('creator').order_by('-created_at')[:6]
@@ -51,14 +56,12 @@ class CaseListView(ListView):
     def get_queryset(self):
         queryset = Case.objects.filter(status='active').select_related('creator')
 
-
         search_query = self.request.GET.get('search')
         if search_query:
             queryset = queryset.filter(
                 Q(title__icontains=search_query) |
                 Q(description__icontains=search_query)
             )
-
 
         sort_by = self.request.GET.get('sort', '-created_at')
         if sort_by in ['-created_at', 'goal_amount', '-goal_amount', 'deadline']:
@@ -97,7 +100,7 @@ def create_case(request):
 
 
 @login_required
-def donate_to_case(request, pk):
+def initiate_payment(request, pk):
     case = get_object_or_404(Case, pk=pk)
 
     if not case.can_receive_donations():
@@ -107,25 +110,144 @@ def donate_to_case(request, pk):
     if request.method == 'POST':
         form = DonationForm(request.POST)
         if form.is_valid():
+            amount = form.cleaned_data['amount']
+            message = form.cleaned_data['message']
+            is_anonymous = form.cleaned_data['is_anonymous']
+
+            paystack = PaystackPayment()
+            user_email = request.user.email if request.user.email else settings.DEFAULT_FROM_EMAIL # Fallback email
+            if not user_email:
+                user_email = "anonymous@example.com"
+
+            response, reference = paystack.initialize_payment(
+                email=user_email,
+                amount=amount,
+                case_id=case.pk,
+                user_id=request.user.pk,
+                message=message,
+                is_anonymous=is_anonymous
+            )
+
+            if response.get('status'):
+                return redirect(response['data']['authorization_url'])
+            else:
+                messages.error(request, f"Payment initiation failed: {response.get('message', 'Unknown error')}")
+                return redirect('case_detail', pk=case.pk)
+        else:
+            messages.error(request, 'Please correct the errors in your donation.')
+            return render(request, 'cases/case_detail.html', {'case': case, 'donation_form': form})
+    else:
+        return redirect('case_detail', pk=pk)
+
+
+@csrf_exempt
+def payment_callback(request ):
+    if request.method == 'GET':
+        reference = request.GET.get('trxref') or request.GET.get('reference')
+        if not reference:
+            messages.error(request, 'Payment reference not found.')
+            return redirect('home')
+
+        paystack = PaystackPayment()
+        verification_response = paystack.verify_payment(reference)
+
+        if verification_response.get('status') and verification_response['data']['status'] == 'success':
+            metadata = verification_response['data']['metadata']
+            amount_paid = Decimal(str(verification_response['data']['amount'])) / 100 # Convert kobo back to Naira
+            transaction_id = verification_response['data']['reference']
+
+            case_id = metadata.get('case_id')
+            user_id = metadata.get('user_id')
+            message = metadata.get('message', '')
+
+
+            is_anonymous_str = metadata.get('is_anonymous', 'False')
+            is_anonymous = is_anonymous_str.lower() == 'true'
             try:
-                with transaction.atomic():
-                    donation = form.save(commit=False)
-                    donation.case = case
-                    donation.donor = request.user
-                    donation.save()
+                case = Case.objects.get(pk=case_id)
+                donor = User.objects.get(pk=user_id)
 
-                    case.raised_amount += donation.amount
-                    case.save()
+                if not Donation.objects.filter(transaction_id=transaction_id).exists():
+                    with transaction.atomic():
+                        donation = Donation.objects.create(
+                            case=case,
+                            donor=donor,
+                            amount=amount_paid,
+                            message=message,
+                            is_anonymous=is_anonymous,
+                            transaction_id=transaction_id
+                        )
+                        case.raised_amount += amount_paid
+                        case.save()
 
-                    messages.success(
-                        request,
-                        f'Thank you for your donation of ${donation.amount}!'
-                    )
-                    return redirect('case_detail', pk=case.pk)
+                        messages.success(request, f'Thank you for your donation of ₦{amount_paid:.2f} to {case.title}!')
+
+                        send_donation_confirmation_email(donation)
+                        notify_case_creator_of_donation(donation)
+
+                else:
+                    messages.info(request, 'This donation has already been processed.')
+
+                return redirect('case_detail', pk=case.pk)
+
+            except Case.DoesNotExist:
+                messages.error(request, 'Associated case not found.')
+            except User.DoesNotExist:
+                messages.error(request, 'Donor user not found.')
             except Exception as e:
-                messages.error(request, 'There was an error processing your donation. Please try again.')
+                messages.error(request, f'An error occurred while processing your donation. Please contact support.')
+                print(f"Error processing payment callback: {e}")
+                return redirect('home')
 
-    return redirect('case_detail', pk=pk)
+        else:
+            messages.error(request, 'Payment verification failed or was not successful. Please try again.')
+            return redirect('home')
+    elif request.method == 'POST':
+
+        payload = json.loads(request.body)
+        event = payload.get('event')
+
+        if event == 'charge.success':
+            data = payload.get('data')
+            transaction_id = data.get('reference')
+            amount_paid = Decimal(str(data.get('amount'))) / 100
+            metadata = data.get('metadata', {})
+
+            case_id = metadata.get('case_id')
+            user_id = metadata.get('user_id')
+            message = metadata.get('message', '')
+
+            is_anonymous_str = metadata.get('is_anonymous', 'False')
+            is_anonymous = is_anonymous_str.lower() == 'true'
+
+            try:
+                case = Case.objects.get(pk=case_id)
+                donor = User.objects.get(pk=user_id)
+
+                if not Donation.objects.filter(transaction_id=transaction_id).exists():
+                    with transaction.atomic():
+                        donation = Donation.objects.create(
+                            case=case,
+                            donor=donor,
+                            amount=amount_paid,
+                            message=message,
+                            is_anonymous=is_anonymous,
+                            transaction_id=transaction_id
+                        )
+                        case.raised_amount += amount_paid
+                        case.save()
+
+                        send_donation_confirmation_email(donation)
+                        notify_case_creator_of_donation(donation)
+                return JsonResponse({'status': 'success'}, status=200)
+            except (Case.DoesNotExist, User.DoesNotExist) as e:
+                print(f"Webhook error: {e}")
+                return JsonResponse({'status': 'error', 'message': 'Invalid case or user ID in metadata'}, status=400)
+            except Exception as e:
+                print(f"Webhook processing error: {e}")
+                return JsonResponse({'status': 'error', 'message': 'Internal server error'}, status=500)
+        return JsonResponse({'status': 'ignored'}, status=200)
+    return JsonResponse({'status': 'error', 'message': 'Invalid request method'}, status=405)
 
 
 @login_required

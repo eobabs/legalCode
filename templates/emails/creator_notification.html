@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>New Donation Received!</title>
+</head>
+<body>
+    <p>Dear {{ donation.case.creator.get_full_name|default:donation.case.creator.username }},</p>
+
+    <p>Good news! Your case, <strong>{{ donation.case.title }}</strong>, has received a new donation!</p>
+
+    <p><strong>Donation Details:</strong></p>
+    <ul>
+        <li>Amount: <strong>₦{{ donation.amount|floatformat:2 }}</strong></li>
+        <li>Donor: {% if donation.is_anonymous %}Anonymous{% else %}{{ donation.donor.get_full_name|default:donation.donor.username }}{% endif %}</li>
+        <li>Date: {{ donation.created_at|date:"F d, Y H:i" }}</li>
+    </ul>
+
+    {% if donation.message %}
+        <p>Donor's message: <em>"{{ donation.message }}"</em></p>
+    {% endif %}
+
+    <p>Your case has now raised <strong>₦{{ donation.case.raised_amount|floatformat:2 }}</strong> out of its <strong>₦{{ donation.case.goal_amount|floatformat:2 }}</strong> goal.</p>
+
+    <p>View your case details and progress here: <a href="{{ request.scheme }}://{{ request.get_host }}{% url 'case_detail' donation.case.pk %}">{{ donation.case.title }}</a></p>
+
+    <p>Keep up the great work!</p>
+
+    <p>Sincerely,<br>The Legal Aid Crowdfunding Team</p>
+</body>
+</html>

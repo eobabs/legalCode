@@ -1,5 +1,5 @@
 {% extends 'base.html' %}
-
+{% load currency_filters %}
 {% block title %}Dashboard - Legal Aid Crowdfunding{% endblock %}
 
 {% block content %}
@@ -30,8 +30,8 @@
                             </div>
                             <div class="col-md-4 text-end">
                                 <div class="mb-2">
-                                    <span class="badge bg-success">${{ case.raised_amount }}</span>
-                                    <span class="text-muted">/ ${{ case.goal_amount }}</span>
+                                    <span class="badge bg-success">${{ case.raised_amount | naira}}</span>
+                                    <span class="text-muted">/ ${{ case.goal_amount | naira }}</span>
                                 </div>
                                 <div class="progress" style="height: 6px;">
                                     <div class="progress-bar" style="width: {{ case.progress_percentage }}%"></div>
@@ -68,7 +68,7 @@
                             </h6>
                             <small class="text-muted">{{ donation.created_at|date:"M d, Y" }}</small>
                         </div>
-                        <span class="badge bg-success">${{ donation.amount }}</span>
+                        <span class="badge bg-success">{{ donation.amount | naira }}</span>
                     </div>
                     {% empty %}
                     <div class="text-center py-3">
