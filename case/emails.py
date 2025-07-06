@@ -1,4 +1,4 @@
-# case/emails.py
+
 from urllib import request
 
 from django.core.mail import send_mail

@@ -1,4 +1,3 @@
-# case/views.py
 import json
 from django.contrib.auth import login
 from django.contrib.auth.models import User
